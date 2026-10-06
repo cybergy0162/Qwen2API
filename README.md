@@ -26,6 +26,7 @@ Qwen-Proxy 是一个将 `https://chat.qwen.ai` 和 `Qwen Code / Qwen Cli` 转换
 - 支持流式/非流式响应
 - 支持多模态（图片识别、视频理解、图片/视频生成）
 - 支持 OpenAI 风格资源端点：`/v1/images/generations`、`/v1/images/edits`、`/v1/videos`
+- 生成的图片/视频自动下载落盘到本地 `assets/generated/`（上游返回的是会过期的 OSS 预签名 URL，不落盘则无法留存）
 - 支持智能搜索、深度思考等高级功能
 - 支持 CLI 端点，提供 256K 上下文和工具调用能力
 - 提供 Web 管理界面，方便配置和监控
@@ -117,6 +118,10 @@ BATCH_LOGIN_CONCURRENCY=5     # 批量添加账号时的登录并发数
 
 # 📸 缓存配置
 CACHE_MODE=default            # 图片缓存模式 (default/file)
+
+# 🖼️ 生成物本地持久化
+ASSET_LOCAL_SAVE=true         # 生成物(图/视频)下载落盘到 assets/generated/ (true/false, 默认 true)
+ASSET_REPLACE_URL=false       # 响应中资源URL改写为本地 /assets/... (true/false, 默认 false)
 ```
 
 #### 📋 配置说明
@@ -245,6 +250,7 @@ docker run -d \
   -e CACHE_MODE=file \
   -e ACCOUNTS= \
   -v ./caches:/app/caches \
+  -v ./assets:/app/assets \
   --name qwen2api \
   rfym21/qwen2api:latest
 ```
