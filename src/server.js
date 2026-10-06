@@ -85,12 +85,15 @@ app.use(verifyRouter)
 app.use('/api', accountsRouter)
 app.use('/api', settingsRouter)
 
-// 生成物本地持久化目录：生成的图片/视频会落盘到这里，单独于前端静态资源，
-// 必须先于 mountFrontend 注册，否则被其 catch-all 通配吞掉
-app.use('/assets', express.static(path.resolve(__dirname, '../../assets')))
-// 关键：文件不存在时必须给 404。否则 fallthrough 到 mountFrontend 的
+// 生成物本地持久化目录：生成的图片/视频落盘到 <runtime>/assets/generated/。
+// 注意只能占用 /assets/generated 这一个前缀：Vite 把前端 bundle 也打成
+// /assets/*.js、/assets/*.css（public/dist/assets），如果整个 /assets 都被这里
+// 拦掉并 fallback 到 404，管理面板的所有静态资源都会 404、页面白屏。
+// 必须早于 mountFrontend 注册，否则被它的 catch-all 吞掉。
+app.use('/assets/generated', express.static(resolveRuntimePath('assets', 'generated')))
+// 生成物文件不存在时必须给 404。否则 fallthrough 到 mountFrontend 的
 // app.get('*')，客户端会拿到 200 + SPA 的 index.html，被当成图片/PNG 解析报错。
-app.get('/assets/*', (req, res) => res.status(404).type('text').send('asset not found'))
+app.get('/assets/generated/*', (req, res) => res.status(404).type('text').send('asset not found'))
 
 mountFrontend(app)
 

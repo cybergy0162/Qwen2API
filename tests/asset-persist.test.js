@@ -101,3 +101,14 @@ test('generated assets directory resolves under the runtime dir', () => {
   // 不应把生成物写进系统临时目录（脱离部署目录会导致重启后丢失）
   assert.ok(!dir.startsWith(os.tmpdir()))
 })
+
+test('generated asset static route must not shadow the frontend bundle', () => {
+  // Vite 把前端 chunk 输出到 public/dist/assets/，浏览器请求同样是 /assets/*.js。
+  // 如果 server.js 用 app.use('/assets', ...) + app.get('/assets/*', 404) 拦下整个前缀，
+  // 管理面板的所有 JS/CSS 会返回 404（页面白屏），CI smoke 会挂在 index-*.js 上。
+  const serverSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8')
+  assert.ok(!/app\.use\(\s*'\/assets'\s*,/.test(serverSource), 'cannot claim the whole /assets prefix')
+  assert.ok(!/app\.get\(\s*'\/assets\/\*'\s*,/.test(serverSource), 'cannot 404 every /assets/* request')
+  assert.match(serverSource, /app\.use\(\s*'\/assets\/generated'\s*,/)
+  assert.match(serverSource, /app\.get\(\s*'\/assets\/generated\//)
+})
