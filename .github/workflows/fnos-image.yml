@@ -1,0 +1,46 @@
+name: Build fnOS image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'docker/**'
+      - '.github/workflows/fnos-image.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # fnOS runs on x86_64; the Dockerfile's default BINARY_SOURCE=build
+      # compiles the bun binary inside the stage, so no pkg_dist prebuild needed.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/qwen2api:latest
+            ghcr.io/${{ github.repository_owner }}/qwen2api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
