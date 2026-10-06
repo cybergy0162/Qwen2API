@@ -85,6 +85,13 @@ app.use(verifyRouter)
 app.use('/api', accountsRouter)
 app.use('/api', settingsRouter)
 
+// 生成物本地持久化目录：生成的图片/视频会落盘到这里，单独于前端静态资源，
+// 必须先于 mountFrontend 注册，否则被其 catch-all 通配吞掉
+app.use('/assets', express.static(path.resolve(__dirname, '../../assets')))
+// 关键：文件不存在时必须给 404。否则 fallthrough 到 mountFrontend 的
+// app.get('*')，客户端会拿到 200 + SPA 的 index.html，被当成图片/PNG 解析报错。
+app.get('/assets/*', (req, res) => res.status(404).type('text').send('asset not found'))
+
 mountFrontend(app)
 
 // 处理错误中间件（必须放在所有路由之后）

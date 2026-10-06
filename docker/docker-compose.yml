@@ -8,6 +8,9 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      # 生成物（图/视频）本地持久化目录，重启/换镜像不丢
+      # Local persistence for generated images/videos
+      - ./assets:/app/assets
     environment:
       # 如果需要修改Docker暴露端口，请修改ports中的参数
       # 示例(8080:3000) 则访问 http://localhost:8080
@@ -47,3 +50,7 @@ services:
       # 图片缓存
       # Image cache mode (default: memory / file: disk)
       - CACHE_MODE=default
+      # 生成物本地落盘 (默认开启；响应中的 URL 仍指向上游，除非 ASSET_REPLACE_URL=true)
+      # Persist generated assets locally (default on; responses keep upstream URLs unless ASSET_REPLACE_URL=true)
+      - ASSET_LOCAL_SAVE=true
+      - ASSET_REPLACE_URL=false

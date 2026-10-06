@@ -43,7 +43,7 @@ FROM ${BINARY_SOURCE} AS selected-binary
 
 FROM alpine:3.24 AS runtime
 RUN apk add --no-cache ca-certificates libstdc++ \
-    && mkdir -p /app/data /app/logs /app/caches
+    && mkdir -p /app/data /app/logs /app/caches /app/assets
 WORKDIR /app
 ENV NODE_ENV=production \
     QWEN2API_RUNTIME_DIR=/app

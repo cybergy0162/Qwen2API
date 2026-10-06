@@ -1,4 +1,5 @@
 const axios = require('axios')
+const fs = require('fs')
 const { logger } = require('../utils/logger.js')
 const { setResponseHeaders } = require('./chat.js')
 const accountManager = require('../utils/account.js')
@@ -10,6 +11,7 @@ const { getDefaultModelByChatType } = require('../models/models-map.js')
 const { getSsxmodForAccount } = require('../utils/ssxmod-manager')
 const { applyProxyToAxiosConfig, getChatBaseUrl } = require('../utils/proxy-helper');
 const { buildRequestHeaders } = require('../utils/header-profile')
+const { persistGeneratedAsset, chooseAssetUrl } = require('../utils/asset-persist')
 const {
     assertChatChallengeBreakerClosed, bindChatChallengeContext, chatChallengeFrom,
     isWafChallengeError, noteChatChallengeAnswer, releaseChatProbe
@@ -722,8 +724,14 @@ const downloadAssetAsBase64 = async (contentUrl, account) => {
  * @param {string} responseFormat - 输出格式
  * @returns {Promise<object>} 图像响应项
  */
-const buildOpenAIImageResultItem = async (contentUrl, responseFormat) => {
+const buildOpenAIImageResultItem = async (contentUrl, responseFormat, localFilePath) => {
     if (responseFormat === 'b64_json') {
+        // 本地已持久化则直接读盘，省一次上游下载（上游 URL 可能已过期）
+        if (localFilePath && fs.existsSync(localFilePath)) {
+            return {
+                b64_json: fs.readFileSync(localFilePath).toString('base64')
+            }
+        }
         return {
             b64_json: await downloadAssetAsBase64(contentUrl)
         }
@@ -1478,23 +1486,30 @@ const generateImageVideoResult = async (payload) => {
         }
 
         if (newChatType === 't2i' || newChatType === 'image_edit') {
-            const contentUrl = await resolveImageResultContentUrl(responseData.data, chatID, token)
+            let contentUrl = await resolveImageResultContentUrl(responseData.data, chatID, token)
             noteChatChallengeAnswer(breakerContext)
+            // 生成物此刻才真正落盘：先下载到 assets/generated/，再决定给客户端哪个 URL
+            const persisted = await persistGeneratedAsset(contentUrl, newChatType)
+            contentUrl = chooseAssetUrl(contentUrl, persisted)
             return {
                 model,
                 chatType: newChatType,
                 contentUrl,
+                localFilePath: persisted?.filePath || null,
                 content: buildImageContent(contentUrl)
             }
         }
 
         if (newChatType === 't2v') {
-            const contentUrl = await resolveVideoResultContentUrl(responseData.data, token, chatID)
+            let contentUrl = await resolveVideoResultContentUrl(responseData.data, token, chatID)
             noteChatChallengeAnswer(breakerContext)
+            const persisted = await persistGeneratedAsset(contentUrl, newChatType)
+            contentUrl = chooseAssetUrl(contentUrl, persisted)
             return {
                 model,
                 chatType: newChatType,
                 contentUrl,
+                localFilePath: persisted?.filePath || null,
                 content: buildVideoContent(contentUrl)
             }
         }
@@ -1673,7 +1688,7 @@ const handleOpenAIImagesGeneration = async (req, res) => {
             stream: false
         })
 
-        const imageData = await buildOpenAIImageResultItem(result.contentUrl, req.body.response_format)
+        const imageData = await buildOpenAIImageResultItem(result.contentUrl, req.body.response_format, result.localFilePath)
 
         res.json({
             created: Math.floor(Date.now() / 1000),
@@ -1722,7 +1737,7 @@ const handleOpenAIImagesEdit = async (req, res) => {
             stream: false
         })
 
-        const imageData = await buildOpenAIImageResultItem(result.contentUrl, req.body.response_format)
+        const imageData = await buildOpenAIImageResultItem(result.contentUrl, req.body.response_format, result.localFilePath)
 
         res.json({
             created: Math.floor(Date.now() / 1000),

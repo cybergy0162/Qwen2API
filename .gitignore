@@ -13,3 +13,5 @@ pkg_dist/
 /public/dist
 .vscode
 .bce-tool/
+
+assets/generated/

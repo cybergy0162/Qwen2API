@@ -145,6 +145,8 @@ CACHE_MODE=default            # 图片缓存模式 (default/file)
 | `REDIS_URL` | Redis 数据库连接地址，使用TLS加密时需使用 `rediss://` 协议 | `redis://localhost:6379` 或 `rediss://xxx.upstash.io` |
 | `BATCH_LOGIN_CONCURRENCY` | 批量添加账号时的登录并发数，可在前端系统设置中动态调整 | `5` |
 | `CACHE_MODE` | 图片缓存存储方式 | `default`/`file` |
+| `ASSET_LOCAL_SAVE` | 生成物（图片/视频）是否下载落盘到 `assets/generated/`。上游返回的是会过期的 OSS 预签名 URL，不落盘则本地无法留存生成物 | `true`（默认）/ `false` |
+| `ASSET_REPLACE_URL` | `true` 时响应中的资源 URL 改写为本地 `/assets/generated/...`（完全本地闭环）；`false` 仍返回上游 URL（本地文件照常落盘） | `true`/`false`（默认） |
 | `LOG_LEVEL` | 日志级别 | `DEBUG`/`INFO`/`WARN`/`ERROR` |
 | `ENABLE_FILE_LOG` | 是否启用文件日志 | `true` 或 `false` |
 | `LOG_DIR` | 日志文件目录 | `./logs` |
@@ -207,6 +209,25 @@ caches/
 ├── [signature2].txt
 └── ...
 ```
+
+#### 🖼️ 生成物本地持久化 (ASSET_LOCAL_SAVE)
+
+上游 `chat.qwen.ai` 对图片/视频生成返回的是 **OSS 预签名 URL，会过期**，原版代码从不把生成的字节写到本地。本项目默认会把每次生成的图片/视频下载落盘：
+
+```
+assets/
+└── generated/
+    ├── [sha1(url)前20位].png    # 按资源 URL 指纹命名，同一 URL 天然去重
+    ├── [sha1(url)前20位].mp4
+    └── ...
+```
+
+- **默认行为**：响应中仍返回上游 URL（任何客户端都能直接取），但字节已同时落到本地 `assets/generated/`；
+- **`ASSET_REPLACE_URL=true`**：响应中的 URL 改写为 `http://<host>/assets/generated/...`，从本服务自身取文件，完全本地闭环；
+- 文件通过 `/assets/...` 静态路由对外提供（404 而非回退到前端页面）；
+- `response_format=b64_json` 时优先读本地文件，省一次上游下载（上游 URL 可能已过期）；
+- 下载失败只记日志并降级回上游 URL，**绝不让持久化失败把生成请求变成失败**；
+- Docker 部署时 `./assets` 已在 compose 中挂载，重启不丢。
 
 ---
 

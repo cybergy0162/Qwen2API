@@ -50,6 +50,12 @@ const config = {
     autoRefresh: true,
     autoRefreshInterval: 6 * 60 * 60,
     cacheMode: process.env.CACHE_MODE || "default",
+    // 生成物（图/视频）本地持久化：默认开启，把上游返回的资源字节落到 assets/generated/
+    // （此前服务端只转发上游 OSS 预签名 URL，从不落盘，URL 过期后本地一无所有）
+    assetLocalSave: process.env.ASSET_LOCAL_SAVE !== 'false',
+    // true = 响应里的资源 URL 改写为本地 /assets/... 地址（完全本地闭环）；
+    // false = 仍返回上游 URL，但本地文件照常落盘
+    assetReplaceUrl: process.env.ASSET_REPLACE_URL === 'true',
     logLevel: process.env.LOG_LEVEL || "INFO",
     enableFileLog: process.env.ENABLE_FILE_LOG === 'true',
     logDir: process.env.LOG_DIR || "./logs",
