@@ -94,6 +94,10 @@ app.use('/assets/generated', express.static(resolveRuntimePath('assets', 'genera
 // 生成物文件不存在时必须给 404。否则 fallthrough 到 mountFrontend 的
 // app.get('*')，客户端会拿到 200 + SPA 的 index.html，被当成图片/PNG 解析报错。
 app.get('/assets/generated/*', (req, res) => res.status(404).type('text').send('asset not found'))
+// 聊天路径捕获的交付物（HTML/代码/PDF）目录：同样静态暴露，方便浏览器直接打开。
+// 与 /assets/generated 一样必须在 mountFrontend 之前注册，避免被 SPA catch-all 吞掉。
+app.use('/artifacts', express.static(resolveRuntimePath('artifacts')))
+app.get('/artifacts/*', (req, res) => res.status(404).type('text').send('artifact not found'))
 
 mountFrontend(app)
 

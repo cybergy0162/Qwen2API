@@ -16,6 +16,7 @@ const { consumeSSEStream, createUpstreamResponseFilter } = require('../utils/sse
 const accountManager = require('../utils/account.js')
 const config = require('../config/index.js')
 const { logger } = require('../utils/logger')
+const { captureArtifacts } = require('../utils/artifact-local.js')
 const { createUpstreamDeltaNormalizer, createClientToolNamePredicate } = require('../utils/chat-helpers.js')
 const {
     assertNoUpstreamFailure,
@@ -543,6 +544,20 @@ const handleOpenAIAgentStream = async (
     const completionText = `${output.reasoning}${output.content}${JSON.stringify(attempt.toolCalls || [])}`
     const usage = normalizeAgentUsage(attempt, requestBody, completionText)
     attributeChatUsage(runtime.currentAccount || options.currentAccount, usage)
+    // 流式路径：把本次交付的可见文本（已实时发送 + 尾部）作为交付物扫描对象，抓成本地文件。
+    if (config.artifactDir) {
+        const fullVisible = `${streamedVisibleText}${bufferedContent}`
+        const saved = await captureArtifacts(fullVisible, 'stream')
+        if (saved.length) {
+            res.write(`data: ${JSON.stringify({
+                id: `chatcmpl-${messageId}`,
+                object: 'artifact',
+                created,
+                model: requestBody?.model || null,
+                local_files: saved.map((a) => a.path)
+            })}\n\n`)
+        }
+    }
     res.write(`data: ${JSON.stringify({
         id: `chatcmpl-${messageId}`,
         object: 'chat.completion.chunk',
@@ -619,6 +634,11 @@ const handleOpenAIAgentNonStream = async (
     const completionText = `${output.reasoning}${output.content}${JSON.stringify(attempt.toolCalls || [])}`
     const usage = normalizeAgentUsage(attempt, requestBody, completionText)
     attributeChatUsage(runtime.currentAccount || options.currentAccount, usage)
+    // 非流式路径：把返回正文里的内联代码块/托管链接抓成本地文件，并在消息上带 local_files。
+    if (config.artifactDir && output.content) {
+        const saved = await captureArtifacts(output.content, 'non-stream')
+        if (saved.length) assistantMessage.local_files = saved.map((a) => a.path)
+    }
     res.json({
         id: `chatcmpl-${generateUUID()}`,
         object: 'chat.completion',

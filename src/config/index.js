@@ -1,4 +1,5 @@
 const dotenv = require('dotenv')
+const { resolveRuntimePath } = require('../utils/runtime-paths')
 dotenv.config()
 
 /**
@@ -56,6 +57,9 @@ const config = {
     // true = 响应里的资源 URL 改写为本地 /assets/... 地址（完全本地闭环）；
     // false = 仍返回上游 URL，但本地文件照常落盘
     assetReplaceUrl: process.env.ASSET_REPLACE_URL === 'true',
+    // 交付物（HTML/代码/PDF 等）本地落盘目录：聊天路径把内联代码块/托管链接抓成本地文件。
+    // 默认 <runtime>/artifacts；空字符串 '' = 关闭。
+    artifactDir: process.env.ARTIFACT_DIR || resolveRuntimePath('artifacts'),
     logLevel: process.env.LOG_LEVEL || "INFO",
     enableFileLog: process.env.ENABLE_FILE_LOG === 'true',
     logDir: process.env.LOG_DIR || "./logs",
